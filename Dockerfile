@@ -66,6 +66,7 @@ RUN set -eux; \
         printf 'gcc\t%s\t%s\n' "${UBUNTU_APT_GCC_VERSION}" "$(gcc -dumpfullversion -dumpversion)"; \
         printf 'g++\t%s\t%s\n' "${UBUNTU_APT_GPP_VERSION}" "$(g++ -dumpfullversion -dumpversion)"; \
     } > /usr/share/pasturestack/manifests/builder-toolchain.tsv; \
+    rm -f /usr/bin/pebble; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/* /tmp/* /var/tmp/*; \
     rm -f /var/log/apt/* /var/log/dpkg.log /var/log/alternatives.log /var/cache/ldconfig/aux-cache

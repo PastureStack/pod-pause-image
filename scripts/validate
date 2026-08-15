@@ -37,7 +37,12 @@ grep -F 'gcc="${UBUNTU_APT_GCC_VERSION}"' Dockerfile >/dev/null
 grep -F 'builder-ubuntu-packages.tsv' Dockerfile >/dev/null
 grep -F 'builder-toolchain.tsv' Dockerfile >/dev/null
 grep -F 'runtime-ubuntu-packages.tsv' Dockerfile >/dev/null
+grep -F 'rm -f /usr/bin/pebble' Dockerfile >/dev/null
 grep -F 'ARG IMAGE_VERSION=v3.0.2' Dockerfile >/dev/null
+grep -F 'aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969' \
+    .github/workflows/security-release-gate.yml >/dev/null
+grep -F 'builder-unfixed-kernel-header-findings.json' \
+    .github/workflows/security-release-gate.yml >/dev/null
 if grep -Eq 'v[0-9]+\.[0-9]+\.[0-9]+-pasturestack\.' Dockerfile README.md; then
     printf '%s\n' 'Product suffixes are not allowed in release version numbers.' >&2
     exit 1

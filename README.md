@@ -25,7 +25,7 @@ docker build --pull \
   -t ghcr.io/pasturestack/pod-pause-image:v3.0.2 .
 ```
 
-The runtime base is pinned to the reviewed Ubuntu 26.04 `linux/amd64` manifest. The build stage uses the HTTPS Ubuntu snapshot and exact direct-package versions recorded in [`ubuntu-apt.lock`](ubuntu-apt.lock). The final image carries the resolved builder toolchain, builder package, and runtime package manifests under `/usr/share/pasturestack/manifests/`; CI also records builder and runtime image inspections, CycloneDX SBOMs, vulnerability reports, and signal-handling smoke tests as a 30-day review artifact.
+The runtime base is pinned to the reviewed Ubuntu 26.04 `linux/amd64` manifest. The build stage uses the HTTPS Ubuntu snapshot and exact direct-package versions recorded in [`ubuntu-apt.lock`](ubuntu-apt.lock). The final image carries the resolved builder toolchain, builder package, and runtime package manifests under `/usr/share/pasturestack/manifests/`; CI also records builder and runtime image inspections, CycloneDX SBOMs, vulnerability reports, and signal-handling smoke tests as a 30-day review artifact. Runtime High and Critical findings are rejected. The non-shipping builder additionally rejects every High or Critical finding except Ubuntu `linux-libc-dev` kernel-header records for which the vendor has not published a fixed package; those records remain explicit review evidence and become blocking as soon as a fixed version exists.
 
 ## Smoke test
 
