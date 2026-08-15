@@ -1,0 +1,171 @@
+name: Build, smoke test, and security evidence
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pod-pause-image-security-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-test-sbom:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      CANDIDATE_BUILDER_IMAGE: pasturestack/pod-pause-image-builder:${{ github.sha }}
+      CANDIDATE_IMAGE: pasturestack/pod-pause-image:${{ github.sha }}
+      TRIVY_IMAGE: aquasec/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
+    steps:
+      - name: Check out candidate
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Validate source and build contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -z "$(git status --porcelain)"
+          mkdir -p evidence
+          git rev-parse HEAD > evidence/source-revision.txt
+          sha256sum Dockerfile ubuntu-apt.lock pause.c \
+            > evidence/source-inputs.sha256
+          bash scripts/validate
+          git diff --check
+
+      - name: Build candidate and collect manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p evidence/manifests
+          docker build \
+            --target build \
+            --tag "$CANDIDATE_BUILDER_IMAGE" \
+            .
+          docker build \
+            --build-arg "SOURCE_REVISION=${GITHUB_SHA}" \
+            --tag "$CANDIDATE_IMAGE" \
+            .
+          docker image inspect "$CANDIDATE_BUILDER_IMAGE" \
+            > evidence/builder-image-inspect.json
+          docker image inspect "$CANDIDATE_IMAGE" > evidence/image-inspect.json
+          candidate_container=$(docker create "$CANDIDATE_IMAGE")
+          trap 'docker rm -f "$candidate_container" >/dev/null 2>&1 || true' EXIT
+          docker cp \
+            "$candidate_container:/usr/share/pasturestack/manifests/." \
+            evidence/manifests/
+          test -s evidence/manifests/ubuntu-apt.lock
+          test -s evidence/manifests/builder-ubuntu-packages.tsv
+          test -s evidence/manifests/builder-toolchain.tsv
+          test -s evidence/manifests/runtime-ubuntu-packages.tsv
+          grep -F $'metadata\tubuntu_snapshot\t-\t20260808T000000Z' \
+            evidence/manifests/builder-ubuntu-packages.tsv >/dev/null
+          grep -F $'gcc\t4:15.2.0-5ubuntu1\t15.2.0' \
+            evidence/manifests/builder-toolchain.tsv >/dev/null
+          docker rm "$candidate_container"
+          trap - EXIT
+
+      - name: Verify runtime behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(docker image inspect --format '{{.Config.User}}' "$CANDIDATE_IMAGE")" = '65532:65532'
+          for signal_name in TERM INT; do
+            candidate_container=$(docker run --detach "$CANDIDATE_IMAGE")
+            trap 'docker rm -f "$candidate_container" >/dev/null 2>&1 || true' EXIT
+            test "$(docker inspect --format '{{.State.Running}}' "$candidate_container")" = 'true'
+            sleep 0.1
+            test "$(docker inspect --format '{{.State.Running}}' "$candidate_container")" = 'true'
+            docker kill --signal "$signal_name" "$candidate_container" >/dev/null
+            test "$(docker wait "$candidate_container")" = '0'
+            docker rm "$candidate_container"
+            trap - EXIT
+          done
+
+      - name: Generate SBOM and vulnerability evidence
+        shell: bash
+        run: |
+          set -euo pipefail
+          trivy_cache="$RUNNER_TEMP/pod-pause-trivy-cache"
+          mkdir -p "$trivy_cache"
+          docker pull "$TRIVY_IMAGE"
+          docker run --rm "$TRIVY_IMAGE" --version \
+            > evidence/trivy-version.txt
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$PWD/evidence:/evidence" \
+            --volume "$trivy_cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image \
+            --format cyclonedx \
+            --output /evidence/builder-image.cdx.json \
+            "$CANDIDATE_BUILDER_IMAGE"
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$PWD/evidence:/evidence" \
+            --volume "$trivy_cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image \
+            --scanners vuln \
+            --format json \
+            --output /evidence/builder-image-vulnerabilities.json \
+            "$CANDIDATE_BUILDER_IMAGE"
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$PWD/evidence:/evidence" \
+            --volume "$trivy_cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image \
+            --format cyclonedx \
+            --output /evidence/image.cdx.json \
+            "$CANDIDATE_IMAGE"
+          docker run --rm \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$PWD/evidence:/evidence" \
+            --volume "$trivy_cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image \
+            --scanners vuln \
+            --format json \
+            --output /evidence/image-vulnerabilities.json \
+            "$CANDIDATE_IMAGE"
+          for report in \
+            evidence/builder-image.cdx.json \
+            evidence/builder-image-vulnerabilities.json \
+            evidence/image.cdx.json \
+            evidence/image-vulnerabilities.json; do
+            test -s "$report"
+          done
+          for report in \
+            evidence/builder-image-vulnerabilities.json \
+            evidence/image-vulnerabilities.json; do
+            jq -e '
+              [.Results[]?.Vulnerabilities[]?
+                | select(.Severity == "CRITICAL" or .Severity == "HIGH")]
+              | length == 0
+            ' "$report" >/dev/null
+          done
+
+      - name: Upload review evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: pod-pause-image-security-${{ github.sha }}
+          path: evidence/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Clean runner resources
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          docker ps -aq --filter "ancestor=$CANDIDATE_IMAGE" \
+            | xargs -r docker rm -f
+          docker image rm -f \
+            "$CANDIDATE_BUILDER_IMAGE" \
+            "$CANDIDATE_IMAGE" \
+            "$TRIVY_IMAGE" >/dev/null 2>&1

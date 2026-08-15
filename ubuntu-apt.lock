@@ -1,0 +1,14 @@
+# Ubuntu 26.04 package lock for the pod-pause-image build stage.
+# Refresh the snapshot and every exact direct-package version together.
+# Source indexes are the official resolute, resolute-updates, and
+# resolute-security Packages files below the dated snapshot URL.
+
+UBUNTU_APT_LOCKED_SNAPSHOT='20260808T000000Z'
+
+UBUNTU_APT_BUILD_ESSENTIAL_VERSION='12.12ubuntu2.26.04.2'
+UBUNTU_APT_CA_CERTIFICATES_VERSION='20260601~26.04.1'
+UBUNTU_APT_DPKG_DEV_VERSION='1.23.7ubuntu1'
+UBUNTU_APT_GPP_VERSION='4:15.2.0-5ubuntu1'
+UBUNTU_APT_GCC_VERSION='4:15.2.0-5ubuntu1'
+UBUNTU_APT_LIBC6_DEV_VERSION='2.43-2ubuntu2.3'
+UBUNTU_APT_MAKE_VERSION='4.4.1-3'

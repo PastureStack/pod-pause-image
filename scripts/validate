@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+cleanup() {
+    if [ -n "${pause_pid:-}" ]; then
+        kill -KILL "$pause_pid" 2>/dev/null || true
+        wait "$pause_pid" 2>/dev/null || true
+    fi
+    if [ -n "${validation_dir:-}" ] && [ -d "$validation_dir" ]; then
+        rm -rf -- "$validation_dir"
+    fi
+}
+trap cleanup EXIT
+
+test -f Dockerfile
+test -f ubuntu-apt.lock
+test -f pause.c
+test -f .github/workflows/security-release-gate.yml
+
+. ./ubuntu-apt.lock
+test "$UBUNTU_APT_LOCKED_SNAPSHOT" = '20260808T000000Z'
+test "$UBUNTU_APT_BUILD_ESSENTIAL_VERSION" = '12.12ubuntu2.26.04.2'
+test "$UBUNTU_APT_CA_CERTIFICATES_VERSION" = '20260601~26.04.1'
+test "$UBUNTU_APT_DPKG_DEV_VERSION" = '1.23.7ubuntu1'
+test "$UBUNTU_APT_GPP_VERSION" = '4:15.2.0-5ubuntu1'
+test "$UBUNTU_APT_GCC_VERSION" = '4:15.2.0-5ubuntu1'
+test "$UBUNTU_APT_LIBC6_DEV_VERSION" = '2.43-2ubuntu2.3'
+test "$UBUNTU_APT_MAKE_VERSION" = '4.4.1-3'
+
+grep -F 'ARG UBUNTU_IMAGE=ubuntu:26.04@sha256:' Dockerfile >/dev/null
+grep -F 'https://snapshot.ubuntu.com/ubuntu/20260808T000000Z/' Dockerfile >/dev/null
+grep -F 'https://snapshot.ubuntu.com/ubuntu/%s' Dockerfile >/dev/null
+grep -F 'build-essential="${UBUNTU_APT_BUILD_ESSENTIAL_VERSION}"' Dockerfile >/dev/null
+grep -F 'gcc="${UBUNTU_APT_GCC_VERSION}"' Dockerfile >/dev/null
+grep -F 'builder-ubuntu-packages.tsv' Dockerfile >/dev/null
+grep -F 'builder-toolchain.tsv' Dockerfile >/dev/null
+grep -F 'runtime-ubuntu-packages.tsv' Dockerfile >/dev/null
+grep -F 'ARG IMAGE_VERSION=v3.0.2' Dockerfile >/dev/null
+if grep -Eq 'v[0-9]+\.[0-9]+\.[0-9]+-pasturestack\.' Dockerfile README.md; then
+    printf '%s\n' 'Product suffixes are not allowed in release version numbers.' >&2
+    exit 1
+fi
+if grep -E 'https?://(archive|security)\.ubuntu\.com/ubuntu' Dockerfile; then
+    printf '%s\n' 'Floating Ubuntu archive source is not allowed.' >&2
+    exit 1
+fi
+
+while IFS= read -r action_line; do
+    if ! printf '%s\n' "$action_line" | grep -Eq '@[0-9a-f]{40}([[:space:]]+#.*)?[[:space:]]*$'; then
+        printf 'GitHub Action is not pinned to a full commit SHA: %s\n' "$action_line" >&2
+        exit 1
+    fi
+done < <(grep -R -h -E '^[[:space:]]+uses:' .github/workflows)
+
+if grep -R -E -l \
+    --exclude-dir=.git \
+    -- 'BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY' .; then
+    printf '%s\n' 'Rejected private key material in the committed source tree.' >&2
+    exit 1
+fi
+
+command -v gcc >/dev/null
+validation_dir=$(mktemp -d)
+gcc -O2 -Wall -Wextra -Werror -D_FORTIFY_SOURCE=3 -fstack-protector-strong -fPIE -pie \
+    -Wl,-z,relro -Wl,-z,now -Wl,--build-id=none \
+    -o "$validation_dir/pause" pause.c
+
+for signal_name in TERM INT; do
+    "$validation_dir/pause" &
+    pause_pid=$!
+    kill -0 "$pause_pid"
+    sleep 0.1
+    kill -0 "$pause_pid"
+    kill -"$signal_name" "$pause_pid"
+    wait "$pause_pid"
+    pause_pid=
+done
+
+printf '%s\n' 'POD_PAUSE_VALIDATION_OK'
