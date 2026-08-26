@@ -3,7 +3,7 @@ ARG UBUNTU_IMAGE=ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73
 FROM ${UBUNTU_IMAGE} AS snapshot-ca-bootstrap
 
 ADD --checksum=sha256:6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90 \
-    https://snapshot.ubuntu.com/ubuntu/20260808T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb \
+    https://snapshot.ubuntu.com/ubuntu/20260825T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb \
     /tmp/ca-certificates.deb
 
 RUN set -eux; \
@@ -18,7 +18,7 @@ RUN set -eux; \
 
 FROM ${UBUNTU_IMAGE} AS build
 
-ARG UBUNTU_APT_SNAPSHOT=20260808T000000Z
+ARG UBUNTU_APT_SNAPSHOT=20260825T000000Z
 
 ENV DEBIAN_FRONTEND=noninteractive
 
