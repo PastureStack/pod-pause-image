@@ -3,7 +3,7 @@
 # Source indexes are the official resolute, resolute-updates, and
 # resolute-security Packages files below the dated snapshot URL.
 
-UBUNTU_APT_LOCKED_SNAPSHOT='20260808T000000Z'
+UBUNTU_APT_LOCKED_SNAPSHOT='20260825T000000Z'
 
 UBUNTU_APT_BUILD_ESSENTIAL_VERSION='12.12ubuntu2.26.04.2'
 UBUNTU_APT_CA_CERTIFICATES_VERSION='20260601~26.04.1'
