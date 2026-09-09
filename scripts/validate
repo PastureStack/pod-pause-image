@@ -39,6 +39,8 @@ grep -F 'builder-toolchain.tsv' Dockerfile >/dev/null
 grep -F 'runtime-ubuntu-packages.tsv' Dockerfile >/dev/null
 grep -F 'rm -f /usr/bin/pebble' Dockerfile >/dev/null
 grep -F 'ARG IMAGE_VERSION=v3.0.2' Dockerfile >/dev/null
+grep -F '. ./ubuntu-apt.lock' .github/workflows/security-release-gate.yml >/dev/null
+grep -F 'UBUNTU_APT_LOCKED_SNAPSHOT' .github/workflows/security-release-gate.yml >/dev/null
 grep -F 'aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969' \
     .github/workflows/security-release-gate.yml >/dev/null
 grep -F 'builder-unfixed-kernel-header-findings.json' \

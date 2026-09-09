@@ -65,7 +65,8 @@ jobs:
           test -s evidence/manifests/builder-ubuntu-packages.tsv
           test -s evidence/manifests/builder-toolchain.tsv
           test -s evidence/manifests/runtime-ubuntu-packages.tsv
-          grep -F $'metadata\tubuntu_snapshot\t-\t20260825T000000Z' \
+          . ./ubuntu-apt.lock
+          grep -F $'metadata\tubuntu_snapshot\t-\t'"${UBUNTU_APT_LOCKED_SNAPSHOT}" \
             evidence/manifests/builder-ubuntu-packages.tsv >/dev/null
           grep -F $'gcc\t4:15.2.0-5ubuntu1\t15.2.0' \
             evidence/manifests/builder-toolchain.tsv >/dev/null
