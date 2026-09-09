@@ -1,0 +1,137 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+  attestations: write
+
+concurrency:
+  group: pod-pause-image-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      TARGET_REPOSITORY: ghcr.io/pasturestack/pod-pause-image
+      TRIVY_IMAGE: aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+    steps:
+      - name: Check out immutable tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$GITHUB_REF_TYPE" = tag
+          [[ "$GITHUB_REF_NAME" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          test "$(git cat-file -t "refs/tags/$GITHUB_REF_NAME")" = tag
+          test "$(git rev-list -n 1 "$GITHUB_REF_NAME")" = "$GITHUB_SHA"
+          test "$(sed -n 's/^ARG IMAGE_VERSION=//p' Dockerfile)" = "$GITHUB_REF_NAME"
+          test -z "$(git status --porcelain)"
+          bash scripts/validate
+          git diff --check
+
+      - name: Build and smoke-test exact runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$TARGET_REPOSITORY:$GITHUB_REF_NAME"
+          docker build --pull \
+            --build-arg "IMAGE_VERSION=$GITHUB_REF_NAME" \
+            --build-arg "SOURCE_REVISION=$GITHUB_SHA" \
+            --tag "$image" .
+          test "$(docker image inspect --format '{{.Config.User}}' "$image")" = 65532:65532
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.version"}}' "$image")" = "$GITHUB_REF_NAME"
+          test "$(docker image inspect --format '{{index .Config.Labels "org.opencontainers.image.revision"}}' "$image")" = "$GITHUB_SHA"
+          for signal_name in TERM INT; do
+            container="$(docker run --detach "$image")"
+            trap 'docker rm -f "$container" >/dev/null 2>&1 || true' EXIT
+            test "$(docker inspect --format '{{.State.Running}}' "$container")" = true
+            docker kill --signal "$signal_name" "$container" >/dev/null
+            test "$(docker wait "$container")" = 0
+            docker rm "$container"
+            trap - EXIT
+          done
+
+      - name: Scan runtime and generate SBOM
+        shell: bash
+        run: |
+          set -euo pipefail
+          image="$TARGET_REPOSITORY:$GITHUB_REF_NAME"
+          mkdir -p evidence "$RUNNER_TEMP/trivy-cache"
+          docker pull "$TRIVY_IMAGE" >/dev/null
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/evidence:/evidence" \
+            -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image --scanners vuln,secret \
+            --severity CRITICAL,HIGH --exit-code 1 \
+            --format json --output /evidence/runtime-security.json "$image"
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/evidence:/evidence" \
+            -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image --format cyclonedx \
+            --output /evidence/runtime.cdx.json "$image"
+          jq -e '.bomFormat == "CycloneDX" and (.components | length > 0)' \
+            evidence/runtime.cdx.json >/dev/null
+          sha256sum evidence/runtime-security.json evidence/runtime.cdx.json \
+            > evidence/SHA256SUMS
+
+      - name: Publish immutable runtime image
+        id: publish
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          image="$TARGET_REPOSITORY:$GITHUB_REF_NAME"
+          printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+          docker push "$image"
+          reference="$(docker image inspect --format '{{index .RepoDigests 0}}' "$image")"
+          digest="${reference#*@}"
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
+          printf 'digest=%s\n' "$digest" >> "$GITHUB_OUTPUT"
+
+      - name: Attest release evidence
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-checksums: evidence/SHA256SUMS
+
+      - name: Attest runtime image
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.TARGET_REPOSITORY }}
+          subject-digest: ${{ steps.publish.outputs.digest }}
+          push-to-registry: true
+
+      - name: Publish GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "Pod Pause Image $GITHUB_REF_NAME" \
+            --notes 'Pure numeric PastureStack pod-infrastructure image release with signal smoke tests, vulnerability scan, SBOM, checksums, and provenance.' \
+            evidence/runtime-security.json evidence/runtime.cdx.json evidence/SHA256SUMS
+
+      - name: Clean run-owned resources
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          docker logout ghcr.io >/dev/null 2>&1
+          docker image rm -f "$TARGET_REPOSITORY:$GITHUB_REF_NAME" "$TRIVY_IMAGE" >/dev/null 2>&1
+          rm -rf -- evidence "$RUNNER_TEMP/trivy-cache"
