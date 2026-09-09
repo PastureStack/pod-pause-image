@@ -20,17 +20,17 @@ test -f pause.c
 test -f .github/workflows/security-release-gate.yml
 
 . ./ubuntu-apt.lock
-test "$UBUNTU_APT_LOCKED_SNAPSHOT" = '20260825T000000Z'
+test "$UBUNTU_APT_LOCKED_SNAPSHOT" = '20260909T000000Z'
 test "$UBUNTU_APT_BUILD_ESSENTIAL_VERSION" = '12.12ubuntu2.26.04.2'
 test "$UBUNTU_APT_CA_CERTIFICATES_VERSION" = '20260601~26.04.1'
 test "$UBUNTU_APT_DPKG_DEV_VERSION" = '1.23.7ubuntu1'
 test "$UBUNTU_APT_GPP_VERSION" = '4:15.2.0-5ubuntu1'
 test "$UBUNTU_APT_GCC_VERSION" = '4:15.2.0-5ubuntu1'
-test "$UBUNTU_APT_LIBC6_DEV_VERSION" = '2.43-2ubuntu2.3'
+test "$UBUNTU_APT_LIBC6_DEV_VERSION" = '2.43-2ubuntu2.4'
 test "$UBUNTU_APT_MAKE_VERSION" = '4.4.1-3'
 
 grep -F 'ARG UBUNTU_IMAGE=ubuntu:26.04@sha256:' Dockerfile >/dev/null
-grep -F 'https://snapshot.ubuntu.com/ubuntu/20260825T000000Z/' Dockerfile >/dev/null
+grep -F 'https://snapshot.ubuntu.com/ubuntu/20260909T000000Z/' Dockerfile >/dev/null
 grep -F 'https://snapshot.ubuntu.com/ubuntu/%s' Dockerfile >/dev/null
 grep -F 'build-essential="${UBUNTU_APT_BUILD_ESSENTIAL_VERSION}"' Dockerfile >/dev/null
 grep -F 'gcc="${UBUNTU_APT_GCC_VERSION}"' Dockerfile >/dev/null
