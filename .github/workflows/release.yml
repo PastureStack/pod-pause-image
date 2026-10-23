@@ -76,8 +76,11 @@ jobs:
             -v "$PWD/evidence:/evidence" \
             -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
             "$TRIVY_IMAGE" image --scanners vuln,secret \
-            --severity CRITICAL,HIGH --exit-code 1 \
+            --exit-code 0 \
             --format json --output /evidence/runtime-security.json "$image"
+          jq -e '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" or .Severity == "HIGH")] | length == 0' \
+            evidence/runtime-security.json >/dev/null
+          jq -e '[.Results[]?.Secrets[]?] | length == 0' evidence/runtime-security.json >/dev/null
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/evidence:/evidence" \
@@ -134,4 +137,5 @@ jobs:
           set +e
           docker logout ghcr.io >/dev/null 2>&1
           docker image rm -f "$TARGET_REPOSITORY:$GITHUB_REF_NAME" "$TRIVY_IMAGE" >/dev/null 2>&1
-          rm -rf -- evidence "$RUNNER_TEMP/trivy-cache"
+          rm -rf -- evidence
+          sudo rm -rf -- "$RUNNER_TEMP/trivy-cache"

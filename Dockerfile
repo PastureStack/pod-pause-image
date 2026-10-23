@@ -86,7 +86,7 @@ RUN gcc -O2 -Wall -Wextra -Werror -D_FORTIFY_SOURCE=3 -fstack-protector-strong -
 
 FROM ${UBUNTU_IMAGE}
 
-ARG IMAGE_VERSION=v3.0.3
+ARG IMAGE_VERSION=v3.0.4
 ARG SOURCE_REVISION=unknown
 ARG UBUNTU_IMAGE
 
