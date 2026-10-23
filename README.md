@@ -11,7 +11,7 @@ PastureStack is an independent community effort to preserve, audit, and moderniz
 The reviewed `linux/amd64` runtime uses the pure numeric coordinate:
 
 ```text
-ghcr.io/pasturestack/pod-pause-image:v3.0.4
+ghcr.io/pasturestack/pod-pause-image:v3.0.5
 ```
 
 Product identity and provenance are carried by the package name, OCI labels,
@@ -21,7 +21,7 @@ numeric successor after its release and integration gates pass.
 
 ## Build
 
-Version 3.0.4 installs the SHA256-pinned official Ubuntu CA security update in
+Version 3.0.5 installs the SHA256-pinned official Ubuntu CA security update in
 the build stage after the locked snapshot. Both stages apply the existing-package
 security micro-updates in `ubuntu-security-packages.lock` from the signed
 2026-10-23 Ubuntu 26.04 snapshot, without adding or removing packages. This
@@ -33,9 +33,9 @@ signal-handling, privilege or pod-sandbox behavior.
 
 ```sh
 docker build --pull \
-  --build-arg IMAGE_VERSION=v3.0.4 \
+  --build-arg IMAGE_VERSION=v3.0.5 \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
-  -t local/pasturestack/pod-pause-image:v3.0.4 .
+  -t local/pasturestack/pod-pause-image:v3.0.5 .
 ```
 
 The runtime base is pinned to the reviewed Ubuntu 26.04 `linux/amd64` manifest. The build stage uses the HTTPS Ubuntu snapshot and exact direct-package versions recorded in [`ubuntu-apt.lock`](ubuntu-apt.lock). The final image carries the resolved builder toolchain, builder package, and runtime package manifests under `/usr/share/pasturestack/manifests/`; CI also records builder and runtime image inspections, CycloneDX SBOMs, vulnerability reports, and signal-handling smoke tests as a 30-day review artifact. Runtime High and Critical findings are rejected. The non-shipping builder additionally rejects every High or Critical finding except Ubuntu `linux-libc-dev` kernel-header records for which the vendor has not published a fixed package; those records remain explicit review evidence and become blocking as soon as a fixed version exists.
@@ -43,7 +43,7 @@ The runtime base is pinned to the reviewed Ubuntu 26.04 `linux/amd64` manifest. 
 ## Smoke test
 
 ```sh
-docker run -d --name pod-pause-poc local/pasturestack/pod-pause-image:v3.0.4
+docker run -d --name pod-pause-poc local/pasturestack/pod-pause-image:v3.0.5
 docker inspect --format '{{.State.Running}} {{.Config.User}}' pod-pause-poc
 docker stop --time 5 pod-pause-poc
 docker inspect --format '{{.State.ExitCode}}' pod-pause-poc
