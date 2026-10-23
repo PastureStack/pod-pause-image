@@ -47,12 +47,15 @@ def violations(report, ledger, repository):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("report")
-    parser.add_argument("ledger")
+    parser.add_argument("--phase", choices=("candidate", "release"), required=True)
     parser.add_argument("--repository", required=True)
     args = parser.parse_args()
-    failures = violations(json.loads(Path(args.report).read_text(encoding="utf-8")),
-                          json.loads(Path(args.ledger).read_text(encoding="utf-8")), args.repository)
+    if args.phase == "candidate":
+        report = Path("evidence/image-vulnerabilities.json")
+    else:
+        report = Path("evidence/runtime-security.json")
+    failures = violations(json.loads(report.read_text(encoding="utf-8")),
+                          json.loads(Path(".github/runtime-unfixed.json").read_text(encoding="utf-8")), args.repository)
     if failures:
         raise SystemExit("Release vulnerability policy failed:\n" + "\n".join(failures))
     print("RELEASE_VULNERABILITY_POLICY_OK")

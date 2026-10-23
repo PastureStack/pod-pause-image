@@ -176,7 +176,7 @@ jobs:
             | select(.Severity == "CRITICAL" or .Severity == "HIGH")
           ] | length == 0' evidence/image-vulnerabilities.json >/dev/null
           python3 .github/scripts/enforce-runtime-vulnerabilities.py \
-            evidence/image-vulnerabilities.json .github/runtime-unfixed.json \
+            --phase candidate \
             --repository "$GITHUB_REPOSITORY"
           # A fixed LOW/MEDIUM in the builder is actionable too. The existing
           # separately checked kernel-header boundary is not a runtime waiver.
