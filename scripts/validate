@@ -44,7 +44,7 @@ grep -F 'builder-ubuntu-packages.tsv' Dockerfile >/dev/null
 grep -F 'builder-toolchain.tsv' Dockerfile >/dev/null
 grep -F 'runtime-ubuntu-packages.tsv' Dockerfile >/dev/null
 grep -F 'rm -f /usr/bin/pebble' Dockerfile >/dev/null
-grep -F 'ARG IMAGE_VERSION=v3.0.4' Dockerfile >/dev/null
+grep -F 'ARG IMAGE_VERSION=v3.0.5' Dockerfile >/dev/null
 grep -F 'ADD --checksum=sha256:5b6326f1932cfd7be57130561dc78192f09ed9f58bfbe6606ed0c50510c3b6cd' Dockerfile >/dev/null
 grep -F 'https://archive.ubuntu.com/ubuntu/pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.26.04.1_all.deb' Dockerfile >/dev/null
 test "$(grep -Fc 'dpkg -i /tmp/ca-certificates.deb;' Dockerfile)" -eq 1
