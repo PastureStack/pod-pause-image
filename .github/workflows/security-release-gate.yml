@@ -35,7 +35,7 @@ jobs:
           test -z "$(git status --porcelain)"
           mkdir -p evidence
           git rev-parse HEAD > evidence/source-revision.txt
-          sha256sum Dockerfile ubuntu-apt.lock pause.c \
+          sha256sum Dockerfile ubuntu-apt.lock ubuntu-security-packages.lock scripts/install-ubuntu-security-updates.sh pause.c \
             > evidence/source-inputs.sha256
           bash scripts/validate
           git diff --check
@@ -65,6 +65,21 @@ jobs:
           test -s evidence/manifests/builder-ubuntu-packages.tsv
           test -s evidence/manifests/builder-toolchain.tsv
           test -s evidence/manifests/runtime-ubuntu-packages.tsv
+          cmp ubuntu-security-packages.lock evidence/manifests/ubuntu-security-packages.lock
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+          locks = [line.strip().split('=', 1) for line in Path('ubuntu-security-packages.lock').read_text().splitlines() if line.strip() and not line.startswith('#')]
+          for filename in ('builder-ubuntu-packages.tsv', 'runtime-ubuntu-packages.tsv'):
+              packages = {}
+              for line in Path('evidence/manifests', filename).read_text().splitlines():
+                  fields = line.split('\t')
+                  if len(fields) == 4 and fields[0] == 'package':
+                      packages[fields[1].split(':')[0]] = fields[3]
+              for package, minimum in locks:
+                  if package in packages:
+                      subprocess.run(['dpkg', '--compare-versions', packages[package], 'ge', minimum], check=True)
+          PY
           . ./ubuntu-apt.lock
           grep -F $'metadata\tubuntu_snapshot\t-\t'"${UBUNTU_APT_LOCKED_SNAPSHOT}" \
             evidence/manifests/builder-ubuntu-packages.tsv >/dev/null
