@@ -2,8 +2,8 @@ ARG UBUNTU_IMAGE=ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73
 
 FROM ${UBUNTU_IMAGE} AS snapshot-ca-bootstrap
 
-ADD --checksum=sha256:6077d27c6b6f8b23590cb01ff877ed8c804a67a5442cc32b5a33da10d2bd0e90 \
-    https://snapshot.ubuntu.com/ubuntu/20260909T000000Z/pool/main/c/ca-certificates/ca-certificates_20260601~26.04.1_all.deb \
+ADD --checksum=sha256:5b6326f1932cfd7be57130561dc78192f09ed9f58bfbe6606ed0c50510c3b6cd \
+    https://archive.ubuntu.com/ubuntu/pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.26.04.1_all.deb \
     /tmp/ca-certificates.deb
 
 RUN set -eux; \
@@ -23,6 +23,7 @@ ARG UBUNTU_APT_SNAPSHOT=20260909T000000Z
 ENV DEBIAN_FRONTEND=noninteractive
 
 COPY --from=snapshot-ca-bootstrap /snapshot-ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+COPY --from=snapshot-ca-bootstrap /tmp/ca-certificates.deb /tmp/ca-certificates.deb
 COPY ubuntu-apt.lock /usr/share/pasturestack/manifests/ubuntu-apt.lock
 
 RUN set -eux; \
@@ -54,6 +55,8 @@ RUN set -eux; \
         expected="${package_and_version#*=}"; \
         test "$(dpkg-query -W -f='${Version}' "${package}")" = "${expected}"; \
     done; \
+    dpkg -i /tmp/ca-certificates.deb; \
+    test "$(dpkg-query -W -f='${Version}' ca-certificates)" = 20260816ubuntu0.26.04.1; \
     { \
         printf 'record\tname\tarchitecture\tversion\n'; \
         printf 'metadata\tschema\t-\tpasturestack.dpkg-manifest/v1\n'; \
@@ -80,7 +83,7 @@ RUN gcc -O2 -Wall -Wextra -Werror -D_FORTIFY_SOURCE=3 -fstack-protector-strong -
 
 FROM ${UBUNTU_IMAGE}
 
-ARG IMAGE_VERSION=v3.0.2
+ARG IMAGE_VERSION=v3.0.3
 ARG SOURCE_REVISION=unknown
 ARG UBUNTU_IMAGE
 
@@ -92,7 +95,11 @@ LABEL org.opencontainers.image.title="PastureStack Pod Pause Image" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.base.name="docker.io/library/ubuntu:26.04"
 
+COPY --from=snapshot-ca-bootstrap /tmp/ca-certificates.deb /tmp/ca-certificates.deb
 RUN set -eux; \
+    dpkg -i /tmp/ca-certificates.deb; \
+    test "$(dpkg-query -W -f='${Version}' ca-certificates)" = 20260816ubuntu0.26.04.1; \
+    rm -f /tmp/ca-certificates.deb; \
     mkdir -p /usr/share/pasturestack/manifests; \
     { \
         printf 'record\tname\tarchitecture\tversion\n'; \
