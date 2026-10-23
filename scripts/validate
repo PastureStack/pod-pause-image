@@ -24,6 +24,7 @@ grep -F 'libssl3t64=3.5.5-1ubuntu3.7' ubuntu-security-packages.lock >/dev/null
 test "$(grep -Ec '^[[:space:]]+sh /' Dockerfile)" -eq 2
 test -f pause.c
 test -f .github/workflows/security-release-gate.yml
+python3 .github/scripts/test_runtime_vulnerability_policy.py
 
 . ./ubuntu-apt.lock
 test "$UBUNTU_APT_LOCKED_SNAPSHOT" = '20260909T000000Z'
