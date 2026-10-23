@@ -175,6 +175,13 @@ jobs:
             .Results[]?.Vulnerabilities[]?
             | select(.Severity == "CRITICAL" or .Severity == "HIGH")
           ] | length == 0' evidence/image-vulnerabilities.json >/dev/null
+          python3 .github/scripts/enforce-runtime-vulnerabilities.py \
+            --phase candidate \
+            --repository "$GITHUB_REPOSITORY"
+          # A fixed LOW/MEDIUM in the builder is actionable too. The existing
+          # separately checked kernel-header boundary is not a runtime waiver.
+          jq -e '[.Results[]?.Vulnerabilities[]? | select((.FixedVersion // "") != "")] | length == 0' \
+            evidence/builder-image-vulnerabilities.json >/dev/null
 
       - name: Upload review evidence
         if: always()

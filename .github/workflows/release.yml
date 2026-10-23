@@ -81,6 +81,9 @@ jobs:
           jq -e '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" or .Severity == "HIGH")] | length == 0' \
             evidence/runtime-security.json >/dev/null
           jq -e '[.Results[]?.Secrets[]?] | length == 0' evidence/runtime-security.json >/dev/null
+          python3 .github/scripts/enforce-runtime-vulnerabilities.py \
+            --phase release \
+            --repository "$GITHUB_REPOSITORY"
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v "$PWD/evidence:/evidence" \
