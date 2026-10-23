@@ -16,6 +16,12 @@ trap cleanup EXIT
 
 test -f Dockerfile
 test -f ubuntu-apt.lock
+test -f ubuntu-security-packages.lock
+sh -n scripts/install-ubuntu-security-updates.sh
+grep -F '20261023T000000Z' scripts/install-ubuntu-security-updates.sh >/dev/null
+grep -F -- '--only-upgrade --no-install-recommends --no-remove' scripts/install-ubuntu-security-updates.sh >/dev/null
+grep -F 'libssl3t64=3.5.5-1ubuntu3.7' ubuntu-security-packages.lock >/dev/null
+test "$(grep -Ec '^[[:space:]]+sh /' Dockerfile)" -eq 2
 test -f pause.c
 test -f .github/workflows/security-release-gate.yml
 

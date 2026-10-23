@@ -25,6 +25,8 @@ ENV DEBIAN_FRONTEND=noninteractive
 COPY --from=snapshot-ca-bootstrap /snapshot-ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=snapshot-ca-bootstrap /tmp/ca-certificates.deb /tmp/ca-certificates.deb
 COPY ubuntu-apt.lock /usr/share/pasturestack/manifests/ubuntu-apt.lock
+COPY ubuntu-security-packages.lock /usr/share/pasturestack/manifests/ubuntu-security-packages.lock
+COPY scripts/install-ubuntu-security-updates.sh /usr/local/libexec/install-ubuntu-security-updates
 
 RUN set -eux; \
     . /usr/share/pasturestack/manifests/ubuntu-apt.lock; \
@@ -57,6 +59,7 @@ RUN set -eux; \
     done; \
     dpkg -i /tmp/ca-certificates.deb; \
     test "$(dpkg-query -W -f='${Version}' ca-certificates)" = 20260816ubuntu0.26.04.1; \
+    sh /usr/local/libexec/install-ubuntu-security-updates /usr/share/pasturestack/manifests/ubuntu-security-packages.lock /etc/ssl/certs/ca-certificates.crt; \
     { \
         printf 'record\tname\tarchitecture\tversion\n'; \
         printf 'metadata\tschema\t-\tpasturestack.dpkg-manifest/v1\n'; \
@@ -95,7 +98,12 @@ LABEL org.opencontainers.image.title="PastureStack Pod Pause Image" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.base.name="docker.io/library/ubuntu:26.04"
 
+COPY --from=snapshot-ca-bootstrap /snapshot-ca-certificates.crt /tmp/security-ca-bundle.crt
+COPY ubuntu-security-packages.lock /usr/share/pasturestack/manifests/ubuntu-security-packages.lock
+COPY scripts/install-ubuntu-security-updates.sh /tmp/install-ubuntu-security-updates.sh
+
 RUN set -eux; \
+    sh /tmp/install-ubuntu-security-updates.sh /usr/share/pasturestack/manifests/ubuntu-security-packages.lock /tmp/security-ca-bundle.crt; \
     mkdir -p /usr/share/pasturestack/manifests; \
     { \
         printf 'record\tname\tarchitecture\tversion\n'; \
@@ -103,7 +111,10 @@ RUN set -eux; \
         printf 'metadata\tbase_image\t-\t%s\n' "${UBUNTU_IMAGE}"; \
         dpkg-query -W -f='package\t${binary:Package}\t${Architecture}\t${Version}\n' | LC_ALL=C sort; \
     } > /usr/share/pasturestack/manifests/runtime-ubuntu-packages.tsv; \
-    rm -f /usr/bin/pebble
+    rm -f /usr/bin/pebble /tmp/security-ca-bundle.crt /tmp/install-ubuntu-security-updates.sh; \
+    apt-get clean; \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*; \
+    rm -f /var/log/apt/* /var/log/dpkg.log /var/log/alternatives.log /var/cache/ldconfig/aux-cache
 
 COPY --from=build /out-pause /pause
 COPY --from=build /usr/share/pasturestack/manifests/ /usr/share/pasturestack/manifests/
