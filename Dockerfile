@@ -95,11 +95,7 @@ LABEL org.opencontainers.image.title="PastureStack Pod Pause Image" \
       org.opencontainers.image.revision="${SOURCE_REVISION}" \
       org.opencontainers.image.base.name="docker.io/library/ubuntu:26.04"
 
-COPY --from=snapshot-ca-bootstrap /tmp/ca-certificates.deb /tmp/ca-certificates.deb
 RUN set -eux; \
-    dpkg -i /tmp/ca-certificates.deb; \
-    test "$(dpkg-query -W -f='${Version}' ca-certificates)" = 20260816ubuntu0.26.04.1; \
-    rm -f /tmp/ca-certificates.deb; \
     mkdir -p /usr/share/pasturestack/manifests; \
     { \
         printf 'record\tname\tarchitecture\tversion\n'; \

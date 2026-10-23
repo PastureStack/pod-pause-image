@@ -41,7 +41,7 @@ grep -F 'rm -f /usr/bin/pebble' Dockerfile >/dev/null
 grep -F 'ARG IMAGE_VERSION=v3.0.3' Dockerfile >/dev/null
 grep -F 'ADD --checksum=sha256:5b6326f1932cfd7be57130561dc78192f09ed9f58bfbe6606ed0c50510c3b6cd' Dockerfile >/dev/null
 grep -F 'https://archive.ubuntu.com/ubuntu/pool/main/c/ca-certificates/ca-certificates_20260816ubuntu0.26.04.1_all.deb' Dockerfile >/dev/null
-test "$(grep -Fc 'dpkg -i /tmp/ca-certificates.deb;' Dockerfile)" -eq 2
+test "$(grep -Fc 'dpkg -i /tmp/ca-certificates.deb;' Dockerfile)" -eq 1
 grep -F '. ./ubuntu-apt.lock' .github/workflows/security-release-gate.yml >/dev/null
 grep -F 'UBUNTU_APT_LOCKED_SNAPSHOT' .github/workflows/security-release-gate.yml >/dev/null
 grep -F 'aquasec/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969' \

@@ -22,7 +22,8 @@ numeric successor after its release and integration gates pass.
 ## Build
 
 Version 3.0.3 installs the SHA256-pinned official Ubuntu CA security update in
-both stages after the locked snapshot. It does not change pause-process,
+the build stage after the locked snapshot. The runtime has no CA or TLS client
+dependency. This does not change pause-process,
 signal-handling, privilege or pod-sandbox behavior.
 
 ```sh
