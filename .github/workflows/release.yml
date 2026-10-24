@@ -77,6 +77,24 @@ jobs:
             -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
             "$TRIVY_IMAGE" image --scanners vuln,secret \
             --exit-code 0 \
+            --format json --output /evidence/runtime-security-raw.json "$image"
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/evidence:/evidence" \
+            -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image --format cyclonedx \
+            --output /evidence/runtime.cdx.json "$image"
+          backports="$RUNNER_TEMP/pod-pause-image-ubuntu-backports"
+          bash .github/scripts/collect-ubuntu-backport-evidence.sh \
+            "$image" "evidence/runtime.cdx.json" "$backports" \
+            > "evidence/ubuntu-backports-verification.json"
+          tar -C "$backports" -czf "evidence/ubuntu-backports.tar.gz" .
+          docker run --rm -v "$backports:/backports:ro" \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD/evidence:/evidence" \
+            -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image --vex /backports/openvex.json --skip-db-update --scanners vuln,secret \
+            --exit-code 0 \
             --format json --output /evidence/runtime-security.json "$image"
           jq -e '[.Results[]?.Vulnerabilities[]? | select(.Severity == "CRITICAL" or .Severity == "HIGH")] | length == 0' \
             evidence/runtime-security.json >/dev/null
@@ -84,15 +102,9 @@ jobs:
           python3 .github/scripts/enforce-runtime-vulnerabilities.py \
             --phase release \
             --repository "$GITHUB_REPOSITORY"
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
-            -v "$PWD/evidence:/evidence" \
-            -v "$RUNNER_TEMP/trivy-cache:/root/.cache/trivy" \
-            "$TRIVY_IMAGE" image --format cyclonedx \
-            --output /evidence/runtime.cdx.json "$image"
           jq -e '.bomFormat == "CycloneDX" and (.components | length > 0)' \
             evidence/runtime.cdx.json >/dev/null
-          sha256sum evidence/runtime-security.json evidence/runtime.cdx.json \
+          sha256sum evidence/runtime-security-raw.json evidence/ubuntu-backports-verification.json evidence/ubuntu-backports.tar.gz evidence/runtime-security.json evidence/runtime.cdx.json \
             > evidence/SHA256SUMS
 
       - name: Publish immutable runtime image
@@ -131,7 +143,8 @@ jobs:
           gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Pod Pause Image $GITHUB_REF_NAME" \
             --notes 'Pure numeric PastureStack pod-infrastructure image release with signal smoke tests, vulnerability scan, SBOM, checksums, and provenance.' \
-            evidence/runtime-security.json evidence/runtime.cdx.json evidence/SHA256SUMS
+            evidence/runtime-security-raw.json evidence/runtime-security.json evidence/runtime.cdx.json \
+            evidence/ubuntu-backports-verification.json evidence/ubuntu-backports.tar.gz evidence/SHA256SUMS
 
       - name: Clean run-owned resources
         if: always()

@@ -1,5 +1,9 @@
 # PastureStack Pod Pause Image
 
+Linux runtime **`v3.0.6`** consumes verified Ubuntu security backports without adding packages or changing the existing coreutils provider.
+
+The runtime recipe applies the qualified Ubuntu 26.04 backport bundle only to already-installed packages and preserves the selected coreutils provider. The immutable bundle digest and final-image checks are pending. Bundle manifests, qualification, exact-version OpenVEX, source inputs and install/verify receipts are retained under `/usr/share/pasturestack/security/ubuntu-backports/`; raw scan evidence and the existing full-severity release policy remain required.
+
 A small pod-infrastructure image that keeps a container alive, reaps orphaned child processes, and exits cleanly when it receives `SIGTERM` or `SIGINT`.
 
 PastureStack is an independent community effort to preserve, audit, and modernize the Rancher 1.6 ecosystem. It is not affiliated with or endorsed by Rancher Labs or SUSE.
@@ -8,10 +12,10 @@ PastureStack is an independent community effort to preserve, audit, and moderniz
 
 ## Maintained image
 
-The reviewed `linux/amd64` runtime uses the pure numeric coordinate:
+After publication, the candidate `linux/amd64` runtime uses the pure numeric coordinate:
 
 ```text
-ghcr.io/pasturestack/pod-pause-image:v3.0.5
+ghcr.io/pasturestack/pod-pause-image:v3.0.6
 ```
 
 Product identity and provenance are carried by the package name, OCI labels,
@@ -21,7 +25,7 @@ numeric successor after its release and integration gates pass.
 
 ## Build
 
-Version 3.0.5 installs the SHA256-pinned official Ubuntu CA security update in
+The recipe installs the SHA256-pinned official Ubuntu CA security update in
 the build stage after the locked snapshot. Both stages apply the existing-package
 security micro-updates in `ubuntu-security-packages.lock` from the signed
 2026-10-23 Ubuntu 26.04 snapshot, without adding or removing packages. This
@@ -33,9 +37,9 @@ signal-handling, privilege or pod-sandbox behavior.
 
 ```sh
 docker build --pull \
-  --build-arg IMAGE_VERSION=v3.0.5 \
+  --build-arg IMAGE_VERSION=v3.0.6 \
   --build-arg SOURCE_REVISION="$(git rev-parse HEAD)" \
-  -t local/pasturestack/pod-pause-image:v3.0.5 .
+  -t local/pasturestack/pod-pause-image:v3.0.6 .
 ```
 
 The runtime base is pinned to the reviewed Ubuntu 26.04 `linux/amd64` manifest. The build stage uses the HTTPS Ubuntu snapshot and exact direct-package versions recorded in [`ubuntu-apt.lock`](ubuntu-apt.lock). The final image carries the resolved builder toolchain, builder package, and runtime package manifests under `/usr/share/pasturestack/manifests/`; CI also records builder and runtime image inspections, CycloneDX SBOMs, vulnerability reports, and signal-handling smoke tests as a 30-day review artifact.
@@ -45,7 +49,7 @@ The release gate checks the complete runtime vulnerability report. Any available
 ## Smoke test
 
 ```sh
-docker run -d --name pod-pause-poc local/pasturestack/pod-pause-image:v3.0.5
+docker run -d --name pod-pause-poc local/pasturestack/pod-pause-image:v3.0.6
 docker inspect --format '{{.State.Running}} {{.Config.User}}' pod-pause-poc
 docker stop --time 5 pod-pause-poc
 docker inspect --format '{{.State.ExitCode}}' pod-pause-poc
