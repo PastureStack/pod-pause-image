@@ -1,4 +1,7 @@
+# syntax=docker/dockerfile:1.7
 ARG UBUNTU_IMAGE=ubuntu:26.04@sha256:2260313b31c8c011cd2eebe728008efac1b3982be73eb71348ea2648d2c0e09b
+
+ARG UBUNTU_SECURITY_BACKPORTS_IMAGE=ghcr.io/pasturestack/ubuntu-security-backports:v0.1.0@sha256:2742a3d429e4e14bc587f6dedc51ded4246cf90bbaedcd86c67d0885e32a6f2a
 
 FROM ${UBUNTU_IMAGE} AS snapshot-ca-bootstrap
 
@@ -84,9 +87,12 @@ RUN gcc -O2 -Wall -Wextra -Werror -D_FORTIFY_SOURCE=3 -fstack-protector-strong -
         -Wl,-z,relro -Wl,-z,now -Wl,--build-id=none -o /out-pause pause.c \
     && strip /out-pause
 
-FROM ${UBUNTU_IMAGE}
+FROM ${UBUNTU_SECURITY_BACKPORTS_IMAGE} AS ubuntu_security_backports
 
-ARG IMAGE_VERSION=v3.0.5
+FROM ${UBUNTU_IMAGE}
+ARG UBUNTU_SECURITY_BACKPORTS_IMAGE
+
+ARG IMAGE_VERSION=v3.0.6
 ARG SOURCE_REVISION=unknown
 ARG UBUNTU_IMAGE
 
@@ -119,6 +125,25 @@ RUN set -eux; \
 COPY --from=build /out-pause /pause
 COPY --from=build /usr/share/pasturestack/manifests/ /usr/share/pasturestack/manifests/
 COPY LICENSE /usr/share/licenses/pod-pause-image/LICENSE
+
+# Keep the build-only installer and package archives outside the final image.
+RUN --mount=type=bind,from=ubuntu_security_backports,source=/out,target=/opt/pasturestack/ubuntu-security-backports,readonly \
+    set -eux; \
+    evidence=/usr/share/pasturestack/security/ubuntu-backports; \
+    mkdir -p "$evidence"; \
+    /opt/pasturestack/ubuntu-security-backports/install-existing-backports --install-in-docker-build > "$evidence/install.json"; \
+    /opt/pasturestack/ubuntu-security-backports/install-existing-backports --verify-installed > "$evidence/verify.json"; \
+    for file in manifest.json qualification.json source-inputs.lock.json openvex.json; do \
+        cp "/opt/pasturestack/ubuntu-security-backports/$file" "$evidence/$file"; \
+    done; \
+    printf '%s\n' "$UBUNTU_SECURITY_BACKPORTS_IMAGE" > "$evidence/bundle-image.txt"; \
+    (cd "$evidence" && sha256sum manifest.json qualification.json source-inputs.lock.json openvex.json install.json verify.json bundle-image.txt > SHA256SUMS); \
+    { \
+        printf 'record\tname\tarchitecture\tversion\n'; \
+        printf 'metadata\tschema\t-\tpasturestack.dpkg-manifest/v1\n'; \
+        printf 'metadata\tbase_image\t-\t%s\n' "$UBUNTU_IMAGE"; \
+        dpkg-query -W -f='package\t${binary:Package}\t${Architecture}\t${Version}\n' | LC_ALL=C sort; \
+    } > /usr/share/pasturestack/manifests/runtime-ubuntu-packages.tsv
 
 USER 65532:65532
 ENTRYPOINT ["/pause"]
