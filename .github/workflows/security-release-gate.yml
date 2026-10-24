@@ -136,14 +136,28 @@ jobs:
             --volume "$PWD/evidence:/evidence" \
             --volume "$trivy_cache:/root/.cache/trivy" \
             "$TRIVY_IMAGE" image \
-            --format cyclonedx \
-            --output /evidence/image.cdx.json \
+            --scanners vuln \
+            --format json \
+            --output /evidence/image-vulnerabilities-raw.json \
             "$CANDIDATE_IMAGE"
           docker run --rm \
             --volume /var/run/docker.sock:/var/run/docker.sock \
             --volume "$PWD/evidence:/evidence" \
             --volume "$trivy_cache:/root/.cache/trivy" \
             "$TRIVY_IMAGE" image \
+            --format cyclonedx \
+            --output /evidence/image.cdx.json \
+            "$CANDIDATE_IMAGE"
+          backports="$RUNNER_TEMP/pod-pause-image-ubuntu-backports"
+          bash .github/scripts/collect-ubuntu-backport-evidence.sh \
+            "$CANDIDATE_IMAGE" "evidence/image.cdx.json" "$backports" \
+            > "evidence/ubuntu-backports-verification.json"
+          tar -C "$backports" -czf "evidence/ubuntu-backports.tar.gz" .
+          docker run --rm -v "$backports:/backports:ro" \
+            --volume /var/run/docker.sock:/var/run/docker.sock \
+            --volume "$PWD/evidence:/evidence" \
+            --volume "$trivy_cache:/root/.cache/trivy" \
+            "$TRIVY_IMAGE" image --vex /backports/openvex.json --skip-db-update \
             --scanners vuln \
             --format json \
             --output /evidence/image-vulnerabilities.json \
