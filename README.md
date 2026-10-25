@@ -2,7 +2,7 @@
 
 Linux runtime **`v3.0.6`** consumes verified Ubuntu security backports without adding packages or changing the existing coreutils provider.
 
-The runtime recipe applies the qualified Ubuntu 26.04 backport bundle only to already-installed packages and preserves the selected coreutils provider. The immutable bundle digest and final-image checks are pending. Bundle manifests, qualification, exact-version OpenVEX, source inputs and install/verify receipts are retained under `/usr/share/pasturestack/security/ubuntu-backports/`; raw scan evidence and the existing full-severity release policy remain required.
+The runtime recipe applies the qualified Ubuntu 26.04 backport bundle only to already-installed packages and preserves the selected coreutils provider. The published `v3.0.6` image passed the immutable bundle and final-image checks; see the [release evidence](https://github.com/PastureStack/pod-pause-image/actions/runs/40140946513). Bundle manifests, qualification, exact-version OpenVEX, source inputs and install/verify receipts are retained under `/usr/share/pasturestack/security/ubuntu-backports/`; raw scan evidence and the existing full-severity release policy remain required.
 
 A small pod-infrastructure image that keeps a container alive, reaps orphaned child processes, and exits cleanly when it receives `SIGTERM` or `SIGINT`.
 
@@ -12,7 +12,7 @@ PastureStack is an independent community effort to preserve, audit, and moderniz
 
 ## Maintained image
 
-After publication, the candidate `linux/amd64` runtime uses the pure numeric coordinate:
+The published `linux/amd64` runtime uses the pure numeric coordinate:
 
 ```text
 ghcr.io/pasturestack/pod-pause-image:v3.0.6
